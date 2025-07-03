@@ -1,0 +1,15 @@
+[project]
+name = "dialog_bot"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "infrastructure @ file:///${PROJECT_ROOT}/../infrastructure",
+    "aiogram>=3.20.0.post0",
+    "alembic>=1.16.1",
+    "asyncpg>=0.30.0",
+    "environs>=14.2.0",
+    "faststream[nats]>=0.5.43",
+    "redis>=6.2.0",
+    "sqlalchemy>=2.0.41",
+    "cachetools>=6.1.0",
+]

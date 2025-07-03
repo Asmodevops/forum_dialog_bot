@@ -1,0 +1,101 @@
+services:
+  redis:
+    image: redis:latest
+    command:
+      - redis-server
+    env_file:
+      - .env
+    restart: on-failure
+    ports:
+      - ${REDIS_PORT:-6379}:6379
+    volumes:
+      - ./redis-data:/data
+
+  postgres:
+    container_name: postgres
+    image: postgres:16.3-alpine
+    env_file:
+      - .env
+    restart: on-failure
+    ports:
+      - ${DB_PORT:-5432}:5432
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4_container
+    restart: on-failure
+    ports:
+      - ${PGADMIN_PORT:-8888}:80
+    env_file:
+      - .env
+    volumes:
+      - ./pgadmin-data:/var/lib/pgadmin
+
+  nats:
+    image: nats:2.11.6-alpine
+    command: "-c /config/server.conf"
+    restart: unless-stopped
+    environment:
+      - NATS_URL=${NATS_URL}
+    ports:
+      - ${MAIN_PORT:-4222}:4222
+      - ${HTTP_PORT:-8222}:8222
+    volumes:
+      - ./nats/data:/data
+      - ./nats/config/server.conf:/config/server.conf
+
+  nats-nui:
+    image: ghcr.io/nats-nui/nui:latest
+    container_name: nats-nui
+    ports:
+      - ${NUI_PORT:-31311}:31311
+    volumes:
+      - ./nui/db:/db
+    depends_on:
+      - nats
+
+  tg_bot:
+    container_name: dialog_bot
+    build:
+      context: .
+      dockerfile: ./dialog_bot/Dockerfile
+    restart: on-failure
+    env_file:
+      - ./dialog_bot/.env
+    command: >
+      bash -c "cd /app/infrastructure && uv run alembic upgrade head && cd /app/dialog_bot && uv run python main.py"
+    depends_on:
+      - postgres
+      - redis
+      - nats
+      - nats-nui
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  fix-user-consumer:
+    container_name: fix-user-consumer
+    build:
+      context: .
+      dockerfile: ./fix-user-service/Dockerfile
+    restart: on-failure
+    env_file:
+      - ./fix-user-service/.env
+    command: >
+      bash -c "cd /app/fix-user-service && uv run python main.py"
+    depends_on:
+      - nats
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
